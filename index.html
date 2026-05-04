@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Health Charts</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #f5f2ee; --surface: #ffffff; --border: #e2ddd8;
+      --text-primary: #1a1714; --text-secondary: #6b6560;
+      --accent: #7c6f5e; --accent-light: #e8e2da;
+      --open-indicator: #4a7c59;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text-primary); min-height: 100vh; padding-bottom: 60px; }
+    header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 28px 40px 0; position: sticky; top: 0; z-index: 100; }
+    .header-top { display: flex; align-items: baseline; gap: 16px; margin-bottom: 16px; }
+    header h1 { font-family: 'DM Serif Display', serif; font-size: 1.9rem; font-weight: 400; letter-spacing: -0.02em; }
+    header .subtitle { font-size: 0.78rem; color: var(--text-secondary); font-weight: 300; letter-spacing: 0.06em; text-transform: uppercase; }
+    .tabs { display: flex; }
+    .tab-btn { font-family: 'DM Sans', sans-serif; font-size: 0.82rem; font-weight: 500; letter-spacing: 0.04em; background: none; border: none; border-bottom: 3px solid transparent; color: var(--text-secondary); padding: 10px 20px; cursor: pointer; transition: all 0.2s; }
+    .tab-btn:hover { color: var(--text-primary); }
+    .tab-btn.active { color: var(--text-primary); border-bottom-color: var(--text-primary); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* TAB 1 */
+    .controls { padding: 20px 40px; display: flex; gap: 10px; }
+    .controls button { font-family: 'DM Sans', sans-serif; font-size: 0.75rem; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; background: none; border: 1px solid var(--border); color: var(--text-secondary); padding: 6px 14px; border-radius: 20px; cursor: pointer; transition: all 0.2s; }
+    .controls button:hover { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
+    .sections-wrap { max-width: 1200px; margin: 0 auto; padding: 0 40px; display: flex; flex-direction: column; gap: 12px; }
+    .section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; transition: box-shadow 0.2s; }
+    .section:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+    .section-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; cursor: pointer; user-select: none; gap: 12px; }
+    .section-header:hover { background: var(--accent-light); }
+    .section-title { font-family: 'DM Serif Display', serif; font-size: 1.05rem; font-weight: 400; letter-spacing: -0.01em; }
+    .section-meta { font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; }
+    .toggle-icon { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.25s; color: var(--text-secondary); font-size: 14px; }
+    .section.open .toggle-icon { border-color: var(--open-indicator); color: var(--open-indicator); background: #eef5f1; }
+    .section-body { display: none; border-top: 1px solid var(--border); padding: 24px; background: #faf9f7; }
+    .section.open .section-body { display: block; animation: slideDown 0.2s ease; }
+    @keyframes slideDown { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+    .section-body iframe { width: 100%; border: none; border-radius: 4px; display: block; }
+    .table-section .section-body { padding: 0; overflow: hidden; }
+    .table-section .section-body iframe { border-radius: 0; height: 420px; }
+    .left-meta { display: flex; align-items: center; gap: 12px; flex: 1; }
+
+    /* TAB 2 */
+    .pem-wrap { max-width: 1200px; margin: 0 auto; padding: 24px 40px; display: flex; flex-direction: column; gap: 20px; }
+    .pem-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .pem-card-header { padding: 16px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: baseline; gap: 12px; }
+    .pem-card-header h2 { font-family: 'DM Serif Display', serif; font-size: 1.1rem; font-weight: 400; }
+    .pem-card-header p { font-size: 0.78rem; color: var(--text-secondary); }
+    .pem-card-body { padding: 20px 24px; background: #faf9f7; }
+    .chart-wrap { position: relative; width: 100%; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .stat-box { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; text-align: center; }
+    .stat-box .val { font-family: 'DM Serif Display', serif; font-size: 1.7rem; line-height: 1; margin-bottom: 4px; }
+    .stat-box .lbl { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
+    .insight { background: #fffbf5; border: 1px solid #e8d9bb; border-radius: 6px; padding: 14px 18px; font-size: 0.83rem; line-height: 1.6; color: #4a3f2f; margin-top: 14px; }
+    .risk-legend { display: flex; gap: 16px; margin-top: 10px; font-size: 0.75rem; color: var(--text-secondary); flex-wrap: wrap; }
+    .risk-legend span { display: flex; align-items: center; gap: 5px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .filter-row { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+    .fbtn { font-family: 'DM Sans', sans-serif; font-size: 0.72rem; font-weight: 500; background: none; border: 1px solid var(--border); color: var(--text-secondary); padding: 4px 12px; border-radius: 16px; cursor: pointer; transition: all 0.15s; }
+    .fbtn.on { background: var(--text-primary); border-color: var(--text-primary); color: white; }
+
+    @media (max-width: 680px) {
+      header { padding: 20px 20px 0; }
+      .header-top { flex-direction: column; gap: 2px; }
+      .controls, .sections-wrap, .pem-wrap { padding-left: 16px; padding-right: 16px; }
+      .tab-btn { padding: 10px 12px; font-size: 0.76rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <h1>Health Charts</h1>
+    <span class="subtitle">Live tracking dashboard</span>
+  </div>
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('charts',this)">Charts</button>
+    <button class="tab-btn" onclick="switchTab('pem',this)">PEM Analysis</button>
+  </div>
+</header>
+
+<!-- TAB 1 -->
+<div id="tab-charts" class="tab-panel active">
+  <div class="controls">
+    <button onclick="expandAll()">Expand all</button>
+    <button onclick="collapseAll()">Collapse all</button>
+  </div>
+  <div class="sections-wrap">
+
+    <div class="section table-section open" id="s8">
+      <div class="section-header" onclick="toggle('s8')">
+        <div class="left-meta"><span class="section-title">Metrics</span></div>
+        <span class="section-meta">Table</span><div class="toggle-icon">▾</div>
+      </div>
+      <div class="section-body">
+        <iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vT3nMQhVQkXjGpUUVEhuoovIEMUIyFS_k56vFqN-CBQvxyH_G6-a32s7cpwkuo6PGFWp-gLT6hWv3eI/pubhtml?gid=133664846&range=B4:F17&widget=false&headers=false&chrome=false"></iframe>
+      </div>
+    </div>
+
+    <div class="section" id="s1">
+      <div class="section-header" onclick="toggle('s1')">
+        <div class="left-meta"><span class="section-title">Fatigue / Headache / Sleep</span></div>
+        <span class="section-meta">Chart</span><div class="toggle-icon">▾</div>
+      </div>
+      <div class="section-body"><iframe height="436" src="https://docs.google.com/spreadsheets/d/e/2PACX-1vT3nMQhVQkXjGpUUVEhuoovIEMUIyFS_k56vFqN-CBQvxyH_G6-a32s7cpwkuo6PGFWp-gLT6hWv3eI/pubchart?oid=1422740253&format=interactive"></iframe></div>
+    </div>
+
+    <div class="section" id="s2">
+      <div class="section-header" onclick="toggle('s2')">
+        <div class="left-meta"><span class="section-title">Fatigue / Steps / Calories</span></div>
+        <span class="section-meta">Chart</span><div class="toggle-icon">▾</div>
+      </div>
+      <div class="section-body"><iframe height="436" src="https://docs.google.com/spreadsheets/d/e/2PACX-1vT3nMQhVQkXjGpUUVEhuoovIEMUIyFS_k56vFqN-CBQvxyH_G6-a32s7cpwkuo6PGFWp-gLT6hWv3eI/pubchart?oid=1673360949&format=interactive"></iframe></div>
+    </div>
+
+    <div class="section" id="s3">
+      <div class="section-header" onclick="toggle('s3')">
+        <div class="left-meta"><span class="section-title">Fatigue / Headache / Sick Leave</span></div>
+        <span class="section-meta">Chart</span><div class="toggle-icon">▾</div>
+      </div>
+      <div class="section-body"><iframe height="462" src="https://docs.google.com/spreadsheets/d/e/2PACX-1vT3nMQhVQkXjGpUUVEhuoovIEMUIyFS_k56vFqN-CBQvxyH_G6-a32s7cpwkuo6PGFWp-gLT6hWv3eI/pubchart?oid=1989768580&format=interactive"></iframe></div>
+    </div>
+
+    <div class="section" id="s4">
+      <div class="section-header" onclick="toggle('s4')">
+        <div class="left-meta"><span class="section-title">Fatigue / Work Location</span></div>
+        <span class="section-meta">Chart</span><div class="toggle-icon">▾</div>
+      </div>
+      <div class="section-body"><iframe height="462" src="https://docs.google.com/spreadsheets/d/e/2PACX-1vT3nMQhVQkXjGpUUVEhuoovIEMUIyFS_k56vFqN-CBQvxyH_G6-a32s7cpwkuo6PGFWp-gLT6hWv3eI/pubchart?oid=1586934226&format=interactive"></iframe></div>
+    </div>
+
+    <div class="section" id="s5">
+      <div class="section-header" onclick="toggle('s5')">
+        <div class="left-meta"><span class="section-title">Fatigue / Heart Rate</span></div>
+        <span class="section-meta">Chart</span><div class="toggle-icon">▾</div>
+      </div>
+      <div class="section-body"><iframe height="462" src="https://docs.google.com/spreadsheets/d/e/2PACX-1vT3nMQhVQkXjGpUUVEhuoovIEMUIyFS_k56vFqN-CBQvxyH_G6-a32s7cpwkuo6PGFWp-gLT6hWv3eI/pubchart?oid=2054518852&format=interactive"></iframe></div>
+    </div>
+
+    <div class="section" id="s6">
+      <div class="section-header" onclick="toggle('s6')">
+        <div class="left-meta"><span class="section-title">Steps — Daily Average</span></div>
+        <span class="section-meta">Chart</span><div class="toggle-icon">▾</div>
+      </div>
+      <div class="section-body"><iframe height="371" src="https://docs.google.com/spreadsheets/d/e/2PACX-1vT3nMQhVQkXjGpUUVEhuoovIEMUIyFS_k56vFqN-CBQvxyH_G6-a32s7cpwkuo6PGFWp-gLT6hWv3eI/pubchart?oid=759057901&format=interactive"></iframe></div>
+    </div>
+
+    <div class="section" id="s7">
+      <div class="section-header" onclick="toggle('s7')">
+        <div class="left-meta"><span class="section-title">Calories — Daily Average</span></div>
+        <span class="section-meta">Chart</span><div class="toggle-icon">▾</div>
+      </div>
+      <div class="section-body"><iframe height="371" src="https://docs.google.com/spreadsheets/d/e/2PACX-1vT3nMQhVQkXjGpUUVEhuoovIEMUIyFS_k56vFqN-CBQvxyH_G6-a32s7cpwkuo6PGFWp-gLT6hWv3eI/pubchart?oid=1679009312&format=interactive"></iframe></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- TAB 2 -->
+<div id="tab-pem" class="tab-panel">
+  <div class="pem-wrap">
+
+    <div class="pem-card">
+      <div class="pem-card-header"><h2>Summary</h2><p>73 days tracked · Feb 20 – May 3</p></div>
+      <div class="pem-card-body">
+        <div class="stats-grid">
+          <div class="stat-box"><div class="val" style="color:#c0392b">4.9</div><div class="lbl">Avg Fatigue Rating</div></div>
+          <div class="stat-box"><div class="val" style="color:#2980b9">7.6k</div><div class="lbl">Median Daily Steps</div></div>
+          <div class="stat-box"><div class="val" style="color:#d4872a">399</div><div class="lbl">Avg Active Calories</div></div>
+          <div class="stat-box"><div class="val" style="color:#8e44ad">−0.35</div><div class="lbl">Steps↔Fatigue (same day)</div></div>
+          <div class="stat-box"><div class="val" style="color:#8e44ad">−0.21</div><div class="lbl">Steps↔Fatigue (next day)</div></div>
+        </div>
+        <div class="insight">
+          <strong>Key pattern:</strong> On high-activity days, fatigue tends to be <em>lower</em> (r = −0.35) — you're only active when feeling well enough. The next-day correlation (r = −0.21) also stays negative, suggesting a delayed payback effect where high activity is followed by elevated fatigue 1–3 days later. Clearest boom-bust examples are visible in the charts below, particularly Mar 6–9 and Apr 8–12.
+        </div>
+      </div>
+    </div>
+
+    <div class="pem-card">
+      <div class="pem-card-header"><h2>Fatigue &amp; Activity Over Time</h2><p>Daily fatigue rating vs steps and calories — hover for notes</p></div>
+      <div class="pem-card-body">
+        <div class="filter-row">
+          <button class="fbtn on" id="btn-fatigue" onclick="toggleSeries('fatigue')">Fatigue</button>
+          <button class="fbtn on" id="btn-steps" onclick="toggleSeries('steps')">Steps (k)</button>
+          <button class="fbtn on" id="btn-calories" onclick="toggleSeries('calories')">Calories ÷10</button>
+        </div>
+        <div class="chart-wrap" style="height:280px"><canvas id="timelineChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="pem-card">
+      <div class="pem-card-header"><h2>PEM Pacing Risk Score</h2><p>Combined score: activity level + consecutive active days + post-run risk</p></div>
+      <div class="pem-card-body">
+        <div class="chart-wrap" style="height:240px"><canvas id="riskChart"></canvas></div>
+        <div class="risk-legend">
+          <span><span class="dot" style="background:#4a7c59"></span>Low (&lt;3)</span>
+          <span><span class="dot" style="background:#d4872a"></span>Moderate (3–6)</span>
+          <span><span class="dot" style="background:#c0392b"></span>High (&gt;6)</span>
+        </div>
+        <div class="insight">Risk scores above 6 indicate days where cumulative activity load warrants extra rest. Notice high-risk clusters (Mar 6–9, Mar 14, Apr 9–10) are typically followed by elevated fatigue 1–3 days later.</div>
+      </div>
+    </div>
+
+    <div class="pem-card">
+      <div class="pem-card-header"><h2>Next-Day Fatigue vs Today's Steps</h2><p>Does higher activity today predict higher fatigue tomorrow?</p></div>
+      <div class="pem-card-body">
+        <div class="chart-wrap" style="height:260px"><canvas id="scatterChart"></canvas></div>
+        <div class="insight">The slight downward trend (r = −0.21) reflects "borrowing energy": very high-step days tend to be your better days but are often followed by a fatigue bump. Wide spread reflects that PEM delays are variable (1–3 days).</div>
+      </div>
+    </div>
+
+    <div class="pem-card">
+      <div class="pem-card-header"><h2>Weekly Averages</h2><p>Fatigue and steps averaged by week — shows boom-bust rhythm over time</p></div>
+      <div class="pem-card-body">
+        <div class="chart-wrap" style="height:240px"><canvas id="weeklyChart"></canvas></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const DATA = [{"date":"Feb 20","fatigue":8.0,"steps":8.5,"calories":411.0,"active":1,"consec":1,"combinedRisk":1.6,"notes":""},{"date":"Feb 21","fatigue":8.0,"steps":5.5,"calories":299.0,"active":0,"consec":0,"combinedRisk":0.6,"notes":"Needed to rest all day."},{"date":"Feb 22","fatigue":7.0,"steps":6.6,"calories":301.0,"active":0,"consec":0,"combinedRisk":0.6,"notes":""},{"date":"Feb 23","fatigue":4.0,"steps":9.7,"calories":523.0,"active":1,"consec":1,"combinedRisk":2.0,"notes":""},{"date":"Feb 24","fatigue":4.0,"steps":8.5,"calories":389.0,"active":1,"consec":2,"combinedRisk":2.2,"notes":""},{"date":"Feb 25","fatigue":6.0,"steps":9.9,"calories":505.0,"active":1,"consec":3,"combinedRisk":3.2,"notes":""},{"date":"Feb 26","fatigue":6.0,"steps":10.9,"calories":515.0,"active":1,"consec":4,"combinedRisk":4.2,"notes":"Left work early"},{"date":"Feb 27","fatigue":8.0,"steps":7.0,"calories":339.0,"active":0,"consec":0,"combinedRisk":2.6,"notes":"Sick leave"},{"date":"Feb 28","fatigue":8.0,"steps":4.7,"calories":167.0,"active":0,"consec":0,"combinedRisk":1.6,"notes":"Nausea"},{"date":"Mar 1","fatigue":6.0,"steps":7.4,"calories":394.0,"active":0,"consec":0,"combinedRisk":1.1,"notes":""},{"date":"Mar 2","fatigue":7.0,"steps":9.3,"calories":499.0,"active":1,"consec":1,"combinedRisk":1.9,"notes":""},{"date":"Mar 3","fatigue":6.0,"steps":6.9,"calories":270.0,"active":0,"consec":0,"combinedRisk":0.7,"notes":"Very fatigued after walking dog 20 mins"},{"date":"Mar 4","fatigue":3.5,"steps":8.2,"calories":473.0,"active":1,"consec":1,"combinedRisk":1.4,"notes":""},{"date":"Mar 5","fatigue":3.0,"steps":6.6,"calories":272.0,"active":0,"consec":0,"combinedRisk":0.7,"notes":""},{"date":"Mar 6","fatigue":1.0,"steps":12.4,"calories":876.0,"active":1,"consec":1,"combinedRisk":3.2,"notes":"Sleep felt light and restless"},{"date":"Mar 7","fatigue":0.5,"steps":10.4,"calories":700.0,"active":1,"consec":2,"combinedRisk":3.4,"notes":"Tired but not feeling fatigue"},{"date":"Mar 8","fatigue":0.5,"steps":10.4,"calories":586.0,"active":1,"consec":3,"combinedRisk":3.7,"notes":"Negligible fatigue. Sauna 7pm."},{"date":"Mar 9","fatigue":2.0,"steps":8.0,"calories":313.0,"active":1,"consec":4,"combinedRisk":3.1,"notes":""},{"date":"Mar 10","fatigue":7.5,"steps":5.6,"calories":300.0,"active":0,"consec":0,"combinedRisk":2.3,"notes":"⚠️ Crash after 4 active days"},{"date":"Mar 11","fatigue":5.0,"steps":6.6,"calories":383.0,"active":0,"consec":0,"combinedRisk":1.8,"notes":"WFH / worked part day"},{"date":"Mar 12","fatigue":6.0,"steps":8.4,"calories":448.0,"active":1,"consec":1,"combinedRisk":2.2,"notes":"Left work approx 1pm"},{"date":"Mar 13","fatigue":7.0,"steps":10.3,"calories":487.0,"active":1,"consec":2,"combinedRisk":2.8,"notes":"Most of the day off work"},{"date":"Mar 14","fatigue":7.0,"steps":16.9,"calories":854.0,"active":1,"consec":3,"combinedRisk":5.0,"notes":"First Melatonin dose — highest steps day"},{"date":"Mar 15","fatigue":6.5,"steps":7.3,"calories":356.0,"active":0,"consec":0,"combinedRisk":2.5,"notes":""},{"date":"Mar 16","fatigue":5.0,"steps":8.2,"calories":400.0,"active":1,"consec":1,"combinedRisk":2.3,"notes":""},{"date":"Mar 17","fatigue":5.0,"steps":4.9,"calories":254.0,"active":0,"consec":0,"combinedRisk":1.0,"notes":"WFH"},{"date":"Mar 18","fatigue":7.5,"steps":7.0,"calories":306.0,"active":0,"consec":0,"combinedRisk":0.5,"notes":"Took sick leave"},{"date":"Mar 19","fatigue":7.0,"steps":6.2,"calories":368.0,"active":0,"consec":0,"combinedRisk":0.6,"notes":"Came home at lunchtime. Nap 1hr."},{"date":"Mar 20","fatigue":5.5,"steps":8.1,"calories":438.0,"active":1,"consec":1,"combinedRisk":1.4,"notes":"First compression socks"},{"date":"Mar 21","fatigue":2.0,"steps":8.4,"calories":438.0,"active":1,"consec":2,"combinedRisk":2.2,"notes":"Compression socks"},{"date":"Mar 22","fatigue":3.5,"steps":7.7,"calories":477.0,"active":1,"consec":3,"combinedRisk":2.5,"notes":"Compression socks"},{"date":"Mar 23","fatigue":2.0,"steps":6.9,"calories":355.0,"active":0,"consec":0,"combinedRisk":2.2,"notes":"Minimal dizziness. Compression socks"},{"date":"Mar 24","fatigue":3.0,"steps":6.8,"calories":246.0,"active":0,"consec":0,"combinedRisk":1.4,"notes":""},{"date":"Mar 25","fatigue":4.5,"steps":8.2,"calories":393.0,"active":1,"consec":1,"combinedRisk":1.8,"notes":""},{"date":"Mar 26","fatigue":6.0,"steps":9.4,"calories":479.0,"active":1,"consec":2,"combinedRisk":2.4,"notes":"Holter fitted"},{"date":"Mar 27","fatigue":6.0,"steps":5.9,"calories":280.0,"active":0,"consec":0,"combinedRisk":1.6,"notes":""},{"date":"Mar 28","fatigue":6.0,"steps":5.1,"calories":272.0,"active":0,"consec":0,"combinedRisk":1.1,"notes":""},{"date":"Mar 29","fatigue":6.5,"steps":7.0,"calories":252.0,"active":0,"consec":0,"combinedRisk":0.8,"notes":""},{"date":"Mar 30","fatigue":7.0,"steps":6.6,"calories":393.0,"active":0,"consec":0,"combinedRisk":0.6,"notes":""},{"date":"Mar 31","fatigue":4.0,"steps":11.4,"calories":546.0,"active":1,"consec":1,"combinedRisk":2.6,"notes":"GP visit"},{"date":"Apr 1","fatigue":6.0,"steps":8.6,"calories":414.0,"active":1,"consec":2,"combinedRisk":2.3,"notes":"Office morning"},{"date":"Apr 2","fatigue":2.0,"steps":7.5,"calories":393.0,"active":0,"consec":0,"combinedRisk":1.6,"notes":""},{"date":"Apr 3","fatigue":2.0,"steps":11.5,"calories":753.0,"active":1,"consec":1,"combinedRisk":3.4,"notes":"Compression socks"},{"date":"Apr 4","fatigue":1.5,"steps":9.0,"calories":385.0,"active":1,"consec":2,"combinedRisk":2.9,"notes":"Movies with Augie"},{"date":"Apr 5","fatigue":2.0,"steps":10.4,"calories":561.0,"active":1,"consec":3,"combinedRisk":3.4,"notes":""},{"date":"Apr 6","fatigue":2.0,"steps":6.9,"calories":303.0,"active":0,"consec":0,"combinedRisk":2.2,"notes":""},{"date":"Apr 7","fatigue":1.5,"steps":8.1,"calories":402.0,"active":1,"consec":1,"combinedRisk":2.2,"notes":""},{"date":"Apr 8","fatigue":5.0,"steps":10.4,"calories":467.0,"active":1,"consec":2,"combinedRisk":3.2,"notes":"Maze House outing"},{"date":"Apr 9","fatigue":4.5,"steps":10.2,"calories":679.0,"active":1,"consec":3,"combinedRisk":3.5,"notes":"Compression socks"},{"date":"Apr 10","fatigue":5.0,"steps":9.4,"calories":377.0,"active":1,"consec":4,"combinedRisk":3.7,"notes":"Kryal Castle 3.5hr"},{"date":"Apr 11","fatigue":6.0,"steps":6.1,"calories":329.0,"active":0,"consec":0,"combinedRisk":2.4,"notes":""},{"date":"Apr 12","fatigue":7.5,"steps":7.9,"calories":412.0,"active":1,"consec":1,"combinedRisk":2.5,"notes":"⚠️ Fatigue spike after busy week"},{"date":"Apr 13","fatigue":7.0,"steps":8.0,"calories":399.0,"active":1,"consec":2,"combinedRisk":2.6,"notes":"WFH from midday"},{"date":"Apr 14","fatigue":8.0,"steps":5.0,"calories":244.0,"active":0,"consec":0,"combinedRisk":1.5,"notes":""},{"date":"Apr 15","fatigue":6.0,"steps":6.8,"calories":366.0,"active":0,"consec":0,"combinedRisk":1.2,"notes":""},{"date":"Apr 16","fatigue":6.0,"steps":6.1,"calories":284.0,"active":0,"consec":0,"combinedRisk":0.9,"notes":"Neurologist appt"},{"date":"Apr 17","fatigue":1.0,"steps":7.1,"calories":362.0,"active":0,"consec":0,"combinedRisk":0.6,"notes":"Feeling nearly normal — office all day"},{"date":"Apr 18","fatigue":3.5,"steps":11.3,"calories":604.0,"active":1,"consec":1,"combinedRisk":2.6,"notes":"Barwon Heads trip - 8hrs"},{"date":"Apr 19","fatigue":2.5,"steps":10.8,"calories":519.0,"active":1,"consec":2,"combinedRisk":3.2,"notes":"Coffee / dinner / moved couches"},{"date":"Apr 20","fatigue":3.0,"steps":6.2,"calories":305.0,"active":0,"consec":0,"combinedRisk":1.6,"notes":""},{"date":"Apr 21","fatigue":8.0,"steps":5.7,"calories":263.0,"active":0,"consec":0,"combinedRisk":1.2,"notes":"⚠️ Crash after active weekend"},{"date":"Apr 22","fatigue":5.0,"steps":7.4,"calories":368.0,"active":0,"consec":0,"combinedRisk":0.9,"notes":""},{"date":"Apr 23","fatigue":6.0,"steps":7.7,"calories":350.0,"active":1,"consec":1,"combinedRisk":1.2,"notes":""},{"date":"Apr 24","fatigue":8.5,"steps":3.8,"calories":209.0,"active":0,"consec":0,"combinedRisk":0.5,"notes":""},{"date":"Apr 25","fatigue":6.0,"steps":4.5,"calories":232.0,"active":0,"consec":0,"combinedRisk":0.4,"notes":""},{"date":"Apr 26","fatigue":5.0,"steps":5.8,"calories":293.0,"active":0,"consec":0,"combinedRisk":0.5,"notes":"Breakfast at Tin Roof"},{"date":"Apr 27","fatigue":5.0,"steps":5.7,"calories":284.0,"active":0,"consec":0,"combinedRisk":0.6,"notes":"GP Appt"},{"date":"Apr 28","fatigue":6.0,"steps":4.0,"calories":220.0,"active":0,"consec":0,"combinedRisk":0.4,"notes":""},{"date":"Apr 29","fatigue":6.0,"steps":7.8,"calories":407.0,"active":1,"consec":1,"combinedRisk":1.2,"notes":""},{"date":"Apr 30","fatigue":5.0,"steps":5.2,"calories":266.0,"active":0,"consec":0,"combinedRisk":0.6,"notes":"Drove to Geelong"},{"date":"May 1","fatigue":5.0,"steps":7.4,"calories":325.0,"active":0,"consec":0,"combinedRisk":0.6,"notes":"Movie night with Augie"},{"date":"May 2","fatigue":3.5,"steps":8.9,"calories":476.0,"active":1,"consec":1,"combinedRisk":1.7,"notes":"Raked leaves"},{"date":"May 3","fatigue":6.0,"steps":7.6,"calories":376.0,"active":0,"consec":0,"combinedRisk":0.8,"notes":""}];
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'pem' && !window.chartsBuilt) buildCharts();
+}
+function toggle(id) { document.getElementById(id).classList.toggle('open'); }
+function expandAll() { document.querySelectorAll('.section').forEach(s => s.classList.add('open')); }
+function collapseAll() { document.querySelectorAll('.section').forEach(s => s.classList.remove('open')); }
+
+const seriesState = {fatigue:true, steps:true, calories:true};
+let timelineChart;
+window.chartsBuilt = false;
+
+function riskColor(v) {
+  if (v >= 6) return '#c0392b';
+  if (v >= 3) return '#d4872a';
+  return '#4a7c59';
+}
+
+function buildCharts() {
+  window.chartsBuilt = true;
+  const gc = 'rgba(0,0,0,0.06)', tc = '#6b6560';
+  const xAxis = { ticks:{color:tc,maxTicksLimit:14,font:{size:10}}, grid:{color:gc} };
+  const yAxis = { ticks:{color:tc,font:{size:10}}, grid:{color:gc} };
+
+  // TIMELINE
+  timelineChart = new Chart(document.getElementById('timelineChart'), {
+    type:'line',
+    data:{
+      labels: DATA.map(d=>d.date),
+      datasets:[
+        {label:'Fatigue',data:DATA.map(d=>d.fatigue),borderColor:'#c0392b',backgroundColor:'rgba(192,57,43,0.08)',borderWidth:2,pointRadius:2,fill:true,tension:0.3},
+        {label:'Steps (k)',data:DATA.map(d=>d.steps),borderColor:'#2980b9',backgroundColor:'transparent',borderWidth:1.5,pointRadius:2,fill:false,tension:0.3,borderDash:[4,2]},
+        {label:'Calories ÷10',data:DATA.map(d=>+(d.calories/10).toFixed(1)),borderColor:'#d4872a',backgroundColor:'transparent',borderWidth:1.5,pointRadius:2,fill:false,tension:0.3,borderDash:[2,3]}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{display:true,position:'top',labels:{color:tc,font:{size:11},boxWidth:14}},
+        tooltip:{callbacks:{afterBody:items=>{const n=DATA[items[0]?.dataIndex]?.notes;return n?['',n]:[];}}}
+      },
+      scales:{x:xAxis,y:{...yAxis,min:0,max:12}}
+    }
+  });
+
+  // RISK
+  new Chart(document.getElementById('riskChart'), {
+    type:'bar',
+    data:{
+      labels:DATA.map(d=>d.date),
+      datasets:[{label:'Risk Score',data:DATA.map(d=>d.combinedRisk),backgroundColor:DATA.map(d=>riskColor(d.combinedRisk)),borderRadius:2}]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{afterBody:items=>{const d=DATA[items[0]?.dataIndex];return[`Steps: ${d.steps}k`,`Consec active: ${d.consec}d`,d.notes||''].filter(Boolean);}}}
+      },
+      scales:{x:xAxis,y:{...yAxis,min:0,max:10}}
+    }
+  });
+
+  // SCATTER
+  const scatterPts = DATA
+    .filter((d,i)=>i<DATA.length-1&&d.fatigue!==null&&DATA[i+1].fatigue!==null)
+    .map((d,i)=>({x:d.steps,y:DATA[DATA.indexOf(d)+1].fatigue,label:d.date}));
+
+  new Chart(document.getElementById('scatterChart'), {
+    type:'scatter',
+    data:{datasets:[{label:'Steps→Next-Day Fatigue',data:scatterPts,backgroundColor:'rgba(41,128,185,0.45)',pointRadius:5}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:i=>`${i.raw.label}: ${i.raw.x}k steps → fatigue ${i.raw.y}`}}},
+      scales:{
+        x:{...xAxis,title:{display:true,text:"Today's Steps (k)",color:tc,font:{size:10}}},
+        y:{...yAxis,min:0,max:10,title:{display:true,text:'Next-Day Fatigue',color:tc,font:{size:10}}}
+      }
+    }
+  });
+
+  // WEEKLY
+  const weeks={};
+  DATA.forEach((d,i)=>{
+    const w=Math.floor(i/7);
+    if(!weeks[w]) weeks[w]={fatigue:[],steps:[],label:d.date};
+    if(d.fatigue!==null) weeks[w].fatigue.push(d.fatigue);
+    weeks[w].steps.push(d.steps);
+  });
+  const wVals=Object.values(weeks);
+
+  new Chart(document.getElementById('weeklyChart'), {
+    type:'bar',
+    data:{
+      labels:wVals.map(w=>'w/c '+w.label),
+      datasets:[
+        {label:'Avg Fatigue',data:wVals.map(w=>+(w.fatigue.reduce((a,b)=>a+b,0)/w.fatigue.length).toFixed(1)),backgroundColor:'rgba(192,57,43,0.7)',borderRadius:3},
+        {label:'Avg Steps (k)',data:wVals.map(w=>+(w.steps.reduce((a,b)=>a+b,0)/w.steps.length).toFixed(1)),backgroundColor:'rgba(41,128,185,0.6)',borderRadius:3}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:true,position:'top',labels:{color:tc,font:{size:11},boxWidth:14}}},
+      scales:{x:xAxis,y:{...yAxis,min:0}}
+    }
+  });
+}
+
+function toggleSeries(name) {
+  seriesState[name]=!seriesState[name];
+  document.getElementById('btn-'+name).classList.toggle('on',seriesState[name]);
+  const idx={fatigue:0,steps:1,calories:2}[name];
+  timelineChart.data.datasets[idx].hidden=!seriesState[name];
+  timelineChart.update();
+}
+</script>
+</body>
+</html>
